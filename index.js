@@ -3,7 +3,7 @@ const notifier = require("node-notifier");
 const nodeNotifier = require("node-notifier");
 const { addListener } = require("node-notifier");
 
-let last = [];
+let lastMap = {};
 let haveNotified = false;
 async function check() {
     const client = new NugetClient(),
@@ -11,14 +11,13 @@ async function check() {
         mine = searchResults.data.filter(o => o.projectUrl && o.projectUrl.indexOf("fluffynuts") > -1),
         packageVersions = mine.map(o => ({ id: o.id, version: o.version }));
 
-    if (last.length === 0) {
+    if (Object.keys(lastMap).length === 0) {
         reportStartState(packageVersions);
-        last = packageVersions;
+        lastMap = makeMap(packageVersions);
         return;
     }
 
     const
-        lastMap = makeMap(last),
         currentMap = makeMap(packageVersions),
         versions = gatherAllVersions(packageVersions),
         notifications = [];
@@ -27,6 +26,8 @@ async function check() {
             notifications.push(`${pkgId} -> ${currentMap[pkgId]}`);
         }
     });
+
+    Object.keys(currentMap).forEach(k => lastMap[k] = currentMap[k]);
 
     if (notifications.length) {
         const
@@ -44,16 +45,17 @@ async function check() {
         if (versions.length > 1) {
             log(`publication is still in progress: have versions: ${versions.join(", ")}`);
         } else {
-            log("no new pb package versions seen");
+            log("no new package versions seen");
         }
     }
 }
 
 function zeroPad(val) {
     val = (val || "").toString();
-    return val.length < 2
-        ? `0${val}`
-        : val;
+    while (val.length < 2) {
+        val = `0${val}`
+    }
+    return val;
 }
 
 function log(str) {
@@ -71,13 +73,17 @@ function makeMap(packageVersions) {
 }
 
 function gatherAllVersions(packageVersions) {
-    return packageVersions.reduce(
+    var counts = packageVersions.reduce(
         (acc, cur) => {
-            if (acc.indexOf(cur.version) === -1) {
-                acc.push(cur.version);
+            if (acc[cur.version] === undefined) {
+                acc[cur.version] = 1;
+            } else {
+                acc[cur.version]++;
             }
             return acc;
-        }, []);
+        }, {});
+
+    return Object.keys(counts).map(k => `${k} -> ${counts[k]}`);
 }
 
 function reportStartState(packages) {
