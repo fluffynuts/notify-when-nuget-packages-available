@@ -2,15 +2,16 @@ const { NugetClient } = require("node-nuget-client");
 const notifier = require("node-notifier");
 const nodeNotifier = require("node-notifier");
 const { addListener } = require("node-notifier");
+const yargs = require("yargs");
 
 let lastMap = {};
-let haveNotified = false;
-async function check() {
-    const client = new NugetClient(),
-        searchResults = await client.search("PeanutButter"),
-        mine = searchResults.data.filter(o => o.projectUrl && o.projectUrl.indexOf("fluffynuts") > -1),
-        packageVersions = mine.map(o => ({ id: o.id, version: o.version }));
-
+let haveExperiencedUpgrade = false;
+async function check(monitor) {
+    console.log(`check: ${monitor}`);
+    const
+        client = new NugetClient(),
+        searchResults = await client.search(monitor),
+        packageVersions = searchResults.data.map(o => ({ id: o.id, version: o.version }));
     if (Object.keys(lastMap).length === 0) {
         reportStartState(packageVersions);
         lastMap = makeMap(packageVersions);
@@ -40,12 +41,17 @@ async function check() {
             message,
             icon: "no icon plz, kthx"
         });
-        haveNotified = true;
+        haveExperiencedUpgrade = true;
     } else {
         if (versions.length > 1) {
             log(`publication is still in progress: have versions: ${versions.join(", ")}`);
         } else {
-            log("no new package versions seen");
+            if (haveExperiencedUpgrade) {
+                log(">>> looks like package release has stabilised! <<<")
+                haveExperiencedUpgrade = false;
+            } else {
+                log("no new package versions seen");
+            }
         }
     }
 }
@@ -91,10 +97,21 @@ function reportStartState(packages) {
     packages.forEach(p => console.log(`  ${p.id} :: ${p.version}`));
 }
 
+function gatherArgs() {
+    return yargs.usage(`Usage: $0 [name]... {name}
+eg: $0 NSubstitute NExpect
+`);
+}
+
 (async function () {
+    const monitor = gatherArgs().argv._;
+    if (!monitor.length) {
+        console.error("please provide one or more names to monitor");
+        return;
+    }
     while (true) {
         try {
-            await check();
+            await Promise.all(monitor.map(check));
             await new Promise(resolve => setTimeout(resolve, 5000));
         } catch (e) {
             console.error(e);
