@@ -12,6 +12,7 @@ async function check(monitor) {
         client = new NugetClient(),
         searchResults = await client.search(monitor),
         packageVersions = searchResults.data.map(o => ({ id: o.id, version: o.version }));
+        
     if (Object.keys(lastMap).length === 0) {
         reportStartState(packageVersions);
         lastMap = makeMap(packageVersions);
@@ -42,18 +43,10 @@ async function check(monitor) {
             icon: "no icon plz, kthx"
         });
         haveExperiencedUpgrade = true;
-    } else {
-        if (versions.length > 1) {
-            log(`publication is still in progress: have versions: ${versions.join(", ")}`);
-        } else {
-            if (haveExperiencedUpgrade) {
-                log(">>> looks like package release has stabilised! <<<")
-                haveExperiencedUpgrade = false;
-            } else {
-                log("no new package versions seen");
-            }
-        }
     }
+    Object.keys(currentMap).forEach(pkgId => {
+        console.log(`${pkgId} :: ${currentMap[pkgId]}`);
+    });
 }
 
 function zeroPad(val) {
