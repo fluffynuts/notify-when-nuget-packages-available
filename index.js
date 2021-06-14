@@ -11,8 +11,8 @@ async function check(monitor) {
     const
         client = new NugetClient(),
         searchResults = await client.search(monitor),
-        packageVersions = searchResults.data.map(o => ({ id: o.id, version: o.version }));
-        
+        packageVersions = searchResults.data.map(o => ({ id: o.id, version: o.version })).sort((a, b) => a.id < b.id ? -1 : 1);
+
     if (Object.keys(lastMap).length === 0) {
         reportStartState(packageVersions);
         lastMap = makeMap(packageVersions);
@@ -22,14 +22,15 @@ async function check(monitor) {
     const
         currentMap = makeMap(packageVersions),
         versions = gatherAllVersions(packageVersions),
-        notifications = [];
-    Object.keys(currentMap).forEach(pkgId => {
+        notifications = [],
+        currentMapKeys = Object.keys(currentMap).sort();
+    currentMapKeys.forEach(pkgId => {
         if (lastMap[pkgId] !== currentMap[pkgId]) {
             notifications.push(`${pkgId} -> ${currentMap[pkgId]}`);
         }
     });
 
-    Object.keys(currentMap).forEach(k => lastMap[k] = currentMap[k]);
+    currentMapKeys.forEach(k => lastMap[k] = currentMap[k]);
 
     if (notifications.length) {
         const
